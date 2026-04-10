@@ -20,6 +20,7 @@ function App() {
   const [uploadedVideos, setUploadedVideos] = useState({})
   const [generatedClasses, setGeneratedClasses] = useState([])
   const [liveAlerts, setLiveAlerts] = useState([])
+  const [recentAlertId, setRecentAlertId] = useState(null)
 
   const courses = useMemo(
     () => mergeGeneratedClasses(courseList, generatedClasses),
@@ -62,14 +63,21 @@ function App() {
       alertIndex += 1
     }
 
-    pushAlert()
-
     const intervalId = window.setInterval(() => {
       pushAlert()
-    }, 15000)
+    }, 7000)
 
     return () => window.clearInterval(intervalId)
   }, [teacher, currentPage, selectedMode, selectedCourseId, generatedClasses.length, courses])
+
+  useEffect(() => {
+    if (!liveAlerts[0]?.id) return undefined
+
+    setRecentAlertId(liveAlerts[0].id)
+    const timeoutId = window.setTimeout(() => setRecentAlertId(null), 2200)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [liveAlerts])
 
   const handleAuthSubmit = ({ email, name, school }) => {
     setTeacher({
@@ -202,6 +210,7 @@ function App() {
         isLiveMonitoring={selectedMode === 'exam'}
         liveAlerts={liveAlerts}
         mode={activeMode}
+        recentAlertId={recentAlertId}
         onBack={() => setCurrentPage('mode-select')}
         onClassChange={handleClassChange}
         onCourseChange={handleCourseChange}

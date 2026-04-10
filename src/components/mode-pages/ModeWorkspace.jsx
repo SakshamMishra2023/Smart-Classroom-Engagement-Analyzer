@@ -14,6 +14,7 @@ export function ModeWorkspace({
   uploadedVideoName,
   liveAlerts,
   isLiveMonitoring,
+  recentAlertId,
   onBack,
   onLogout,
   onCourseChange,
@@ -216,16 +217,13 @@ export function ModeWorkspace({
                       : `Open notifications (${liveAlerts.length})`}
                   </button>
 
-                  <p className="mt-4 text-xs leading-6 text-slate-400">
-                    Put cheating snapshot images in `public/evidence/` as `exam-alert-1.jpg`,
-                    `exam-alert-2.jpg`, `exam-alert-3.jpg`, and `exam-alert-4.jpg`.
-                  </p>
+                 
                 </div>
               </Panel>
 
               <Panel title="Alert evidence" subtitle="Click a notification to inspect the snapshot">
                 {selectedAlert ? (
-                  <EvidenceViewer alert={selectedAlert} />
+                  <EvidenceViewer alert={selectedAlert} isFresh={selectedAlert.id === recentAlertId} />
                 ) : (
                   <EmptyState text="When a cheating alert appears, click it to inspect the exact evidence image here." />
                 )}
@@ -245,7 +243,7 @@ export function ModeWorkspace({
                           selectedAlert?.id === alert.id
                             ? 'border-rose-200 bg-rose-50'
                             : 'border-slate-200 bg-white hover:border-rose-200 hover:bg-rose-50/50'
-                        }`}
+                        } ${alert.id === recentAlertId ? 'alert-fresh border-rose-300 bg-rose-100' : ''}`}
                         onClick={() => setSelectedAlertId(alert.id)}
                         type="button"
                       >
@@ -468,9 +466,9 @@ function EmptyState({ text }) {
   )
 }
 
-function EvidenceViewer({ alert }) {
+function EvidenceViewer({ alert, isFresh = false }) {
   return (
-    <div className="space-y-4">
+    <div className={`space-y-4 rounded-[28px] p-3 transition ${isFresh ? 'alert-evidence bg-rose-100' : 'bg-slate-50'}`}>
       <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-slate-950">
         <img
           alt={`Alert evidence for ${alert.studentName}`}
@@ -483,7 +481,7 @@ function EvidenceViewer({ alert }) {
         />
       </div>
 
-      <div className="rounded-3xl bg-slate-50 p-5">
+      <div className={`rounded-3xl p-5 ${isFresh ? 'bg-white' : 'bg-white/80'}`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-lg font-semibold text-slate-950">{alert.studentName}</p>
