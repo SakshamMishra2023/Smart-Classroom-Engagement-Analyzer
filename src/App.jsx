@@ -269,7 +269,7 @@ function mergeGeneratedClasses(baseCourses, generated) {
 function buildMockAnalysis(course, modeId, formState) {
   const template = course.modes[modeId].classes[0]
   const variance = 4
-  const title = formState.lectureTitle || 'New classroom analysis'
+  const title = formState.lectureTitle || 'New classrooms analysis'
   const date = formatDate(formState.lectureDate)
 
   return {
