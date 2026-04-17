@@ -82,8 +82,8 @@ export function ModeWorkspace({
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               {isConcentrationMode
-                ? `${teacher.name} can review previous classroom sessions or upload a fresh video to simulate a new analysis run.`
-                : `${teacher.name} can watch live invigilation status, open notifications, and inspect the exact cheating snapshot for each alert.`}
+                ? `${teacher.name} can review previous classroom sessions or upload a fresh video to simulate a new analysis run`
+                : `${teacher.name} can watch live invigilation status, open notifications, and inspect the exact cheating snapshot for each alert`}
             </p>
           </div>
 
