@@ -26,18 +26,18 @@ export function AuthShell({ onSubmit }) {
   }
 
   return (
-    <div className="page-enter relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(59,130,246,0.22),_transparent_28%),radial-gradient(circle_at_bottom_left,_rgba(245,158,11,0.18),_transparent_30%)]" />
-      <div className="relative grid w-full max-w-6xl overflow-hidden rounded-[36px] border border-white/60 bg-white/80 shadow-[0_30px_120px_rgba(15,23,42,0.16)] backdrop-blur lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="flex flex-col justify-between bg-slate-950 px-8 py-10 text-white sm:px-10">
+    <div className="page-enter relative flex min-h-screen items-center justify-center overflow-hidden px-4 py-10 bg-[#0B1120]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(56,189,248,0.15),_transparent_28%),radial-gradient(circle_at_bottom_left,_rgba(139,92,246,0.15),_transparent_30%)]" />
+      <div className="relative grid w-full max-w-6xl overflow-hidden rounded-[36px] border border-slate-700 glass-panel shadow-[0_30px_120px_rgba(0,0,0,0.5)] lg:grid-cols-[1.1fr_0.9fr]">
+        <section className="flex flex-col justify-between bg-slate-900/50 px-8 py-10 text-white sm:px-10">
           <div>
-            <span className="inline-flex rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-sky-200">
-              Smart Classroom Student Analyzer
+            <span className="inline-flex rounded-full border border-sky-500/30 bg-sky-500/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.28em] text-sky-300">
+              Smart Classroom Analyzer
             </span>
-            <h1 className="mt-6 max-w-xl text-4xl font-semibold leading-tight sm:text-5xl">
+            <h1 className="mt-6 max-w-xl text-4xl font-semibold leading-tight sm:text-5xl text-white">
               Classroom analytics that help teachers respond in real time.
             </h1>
-            <p className="mt-5 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
+            <p className="mt-5 max-w-xl text-sm leading-7 text-slate-400 sm:text-base">
               Use this frontend prototype to walk through login, course selection,
               concentration insights, and exam integrity monitoring without any backend.
             </p>
@@ -47,7 +47,7 @@ export function AuthShell({ onSubmit }) {
             {benefits.map((benefit) => (
               <div
                 key={benefit}
-                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-slate-200"
+                className="rounded-2xl border border-slate-700 bg-slate-800/40 px-4 py-4 text-sm text-slate-300"
               >
                 {benefit}
               </div>
@@ -55,21 +55,21 @@ export function AuthShell({ onSubmit }) {
           </div>
         </section>
 
-        <section className="px-6 py-10 sm:px-10">
+        <section className="px-6 py-10 sm:px-10 bg-slate-800/20">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-500">Teacher Access</p>
-              <h2 className="mt-1 text-3xl font-semibold text-slate-900">
+              <p className="text-sm font-medium text-slate-400">Teacher Access</p>
+              <h2 className="mt-1 text-3xl font-semibold text-white">
                 {mode === 'login' ? 'Welcome back' : 'Create account'}
               </h2>
             </div>
 
-            <div className="rounded-full bg-slate-100 p-1 text-sm">
+            <div className="rounded-full bg-slate-800 p-1 text-sm border border-slate-700">
               <button
                 className={`rounded-full px-4 py-2 transition ${
                   mode === 'login'
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-500 hover:text-slate-900'
+                    ? 'bg-sky-600 text-white shadow-lg'
+                    : 'text-slate-400 hover:text-white'
                 }`}
                 onClick={() => setMode('login')}
                 type="button"
@@ -79,8 +79,8 @@ export function AuthShell({ onSubmit }) {
               <button
                 className={`rounded-full px-4 py-2 transition ${
                   mode === 'signup'
-                    ? 'bg-slate-900 text-white'
-                    : 'text-slate-500 hover:text-slate-900'
+                    ? 'bg-sky-600 text-white shadow-lg'
+                    : 'text-slate-400 hover:text-white'
                 }`}
                 onClick={() => setMode('signup')}
                 type="button"
@@ -128,18 +128,18 @@ export function AuthShell({ onSubmit }) {
             />
 
             <button
-              className="w-full rounded-2xl bg-slate-950 px-4 py-4 text-sm font-semibold text-white transition hover:bg-slate-800"
+              className="w-full rounded-2xl bg-sky-600 px-4 py-4 text-sm font-semibold text-white transition hover:bg-sky-500 shadow-lg shadow-sky-500/20"
               type="submit"
             >
               {mode === 'login' ? 'Open dashboard' : 'Create account and continue'}
             </button>
           </form>
 
-          <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+          <div className="mt-8 rounded-3xl border border-slate-700 bg-slate-800/50 p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.26em] text-slate-400">
               Demo Credentials
             </p>
-            <p className="mt-3 text-sm text-slate-600">
+            <p className="mt-3 text-sm text-slate-400">
               Use the prefilled values to jump straight into the teacher workflow for your presentation.
             </p>
           </div>
@@ -152,9 +152,9 @@ export function AuthShell({ onSubmit }) {
 function Field({ label, ...props }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-sm font-medium text-slate-600">{label}</span>
+      <span className="mb-2 block text-sm font-medium text-slate-400">{label}</span>
       <input
-        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-sky-500 focus:ring-4 focus:ring-sky-100"
+        className="w-full rounded-2xl border border-slate-700 bg-slate-900/50 px-4 py-3 text-white outline-none transition placeholder:text-slate-600 focus:border-sky-500 focus:ring-1 focus:ring-sky-500"
         {...props}
       />
     </label>

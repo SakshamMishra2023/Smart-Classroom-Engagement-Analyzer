@@ -47,7 +47,11 @@ export function LineChart({ data, color = '#2563eb', yLabel }) {
           const x = padding + (index * (width - padding * 2)) / Math.max(data.length - 1, 1)
           const y = height - padding - ((item.value - min) / range) * (height - padding * 2)
 
-          return <circle key={item.label} cx={x} cy={y} fill={color} r="4.5" />
+          return (
+            <circle className="hover:r-6 hover:fill-amber-400 transition-all cursor-pointer" key={item.label} cx={x} cy={y} fill={color} r="4.5">
+              <title>{item.label}: {item.value}</title>
+            </circle>
+          )
         })}
       </svg>
       <div className="mt-3 grid grid-cols-6 text-xs text-slate-500">
