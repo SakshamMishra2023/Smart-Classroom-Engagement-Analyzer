@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "backend:dev": "npm --prefix backend run dev",
+    "backend:start": "npm --prefix backend start",
+    "backend:check": "npm --prefix backend run check",
     "lint": "eslint .",
     "preview": "vite preview"
   },

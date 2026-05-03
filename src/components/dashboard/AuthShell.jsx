@@ -6,7 +6,7 @@ const benefits = [
   'Present live student cards, classroom summaries, and alert timelines.',
 ]
 
-export function AuthShell({ onSubmit }) {
+export function AuthShell({ error, isSubmitting = false, onSubmit }) {
   const [mode, setMode] = useState('login')
   const [formState, setFormState] = useState({
     name: 'Dr. Meera Sharma',
@@ -22,7 +22,7 @@ export function AuthShell({ onSubmit }) {
 
   const handleSubmit = (event) => {
     event.preventDefault()
-    onSubmit(formState)
+    onSubmit({ ...formState, authMode: mode })
   }
 
   return (
@@ -38,8 +38,8 @@ export function AuthShell({ onSubmit }) {
               Classroom analytics that help teachers respond in real time.
             </h1>
             <p className="mt-5 max-w-xl text-sm leading-7 text-slate-400 sm:text-base">
-              Use this frontend prototype to walk through login, course selection,
-              concentration insights, and exam integrity monitoring without any backend.
+              Sign in to load your saved MongoDB courses, lecture stats, and Mode A
+              video analysis results.
             </p>
           </div>
 
@@ -127,11 +127,22 @@ export function AuthShell({ onSubmit }) {
               value={formState.password}
             />
 
+            {error ? (
+              <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
+                {error}
+              </div>
+            ) : null}
+
             <button
-              className="w-full rounded-2xl bg-sky-600 px-4 py-4 text-sm font-semibold text-white transition hover:bg-sky-500 shadow-lg shadow-sky-500/20"
+              className="w-full rounded-2xl bg-sky-600 px-4 py-4 text-sm font-semibold text-white shadow-lg shadow-sky-500/20 transition hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-70"
+              disabled={isSubmitting}
               type="submit"
             >
-              {mode === 'login' ? 'Open dashboard' : 'Create account and continue'}
+              {isSubmitting
+                ? 'Connecting...'
+                : mode === 'login'
+                  ? 'Open dashboard'
+                  : 'Create account and continue'}
             </button>
           </form>
 
@@ -140,7 +151,8 @@ export function AuthShell({ onSubmit }) {
               Demo Credentials
             </p>
             <p className="mt-3 text-sm text-slate-400">
-              Use the prefilled values to jump straight into the teacher workflow for your presentation.
+              If this is your first run, switch to sign up. The backend will create
+              your teacher account and attach demo courses for Mode A.
             </p>
           </div>
         </section>

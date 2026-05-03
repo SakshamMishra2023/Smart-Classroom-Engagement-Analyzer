@@ -20,7 +20,7 @@ export function DonutChart({ data, valueLabel, centerLabel }) {
     <div className="flex flex-col items-center gap-5">
       <div className="relative h-48 w-48">
         <svg className="h-48 w-48 -rotate-90" viewBox="0 0 120 120">
-          <circle cx="60" cy="60" fill="none" r="45" stroke="#e2e8f0" strokeWidth="12" />
+          <circle cx="60" cy="60" fill="none" r="45" stroke="#334155" strokeWidth="12" />
           {segments.map((segment) => (
             <circle
               key={segment.label}
@@ -40,7 +40,7 @@ export function DonutChart({ data, valueLabel, centerLabel }) {
           <span className="text-xs uppercase tracking-[0.28em] text-slate-400">
             {centerLabel}
           </span>
-          <span className="mt-2 text-3xl font-semibold text-slate-950">{valueLabel}</span>
+          <span className="mt-2 text-3xl font-semibold text-slate-100">{valueLabel}</span>
         </div>
       </div>
 
@@ -52,9 +52,9 @@ export function DonutChart({ data, valueLabel, centerLabel }) {
                 className="h-3 w-3 rounded-full"
                 style={{ backgroundColor: item.color }}
               />
-              <span className="text-slate-600">{item.label}</span>
+              <span className="text-slate-300">{item.label}</span>
             </div>
-            <span className="font-medium text-slate-900">{item.value}%</span>
+            <span className="font-medium text-slate-100">{item.value}%</span>
           </div>
         ))}
       </div>

@@ -1,74 +1,179 @@
-import { startTransition, useEffect, useMemo, useState } from 'react'
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AuthShell } from './components/dashboard/AuthShell'
 import { ModeSelection } from './components/ModeSelection'
 import { ModeWorkspace } from './components/mode-pages/ModeWorkspace'
 import { UploadAnalysisPage } from './components/upload/UploadAnalysisPage'
+import { api } from './services/api'
 import { courseList, modeOptions, teacherProfile } from './data/mockData'
+import { adaptModeACourses, adaptModeBCourses } from './utils/modeAAdapter'
+
+const TOKEN_STORAGE_KEY = 'classroom-vision-token'
+const TEACHER_STORAGE_KEY = 'classroom-vision-teacher'
 
 function App() {
   const [teacher, setTeacher] = useState(null)
+  const [authToken, setAuthToken] = useState('')
+  const [authError, setAuthError] = useState('')
+  const [isAuthenticating, setIsAuthenticating] = useState(false)
   const [currentPage, setCurrentPage] = useState('auth')
   const [selectedMode, setSelectedMode] = useState(null)
   const [selectedCourseId, setSelectedCourseId] = useState(courseList[0].id)
   const [selectedClassId, setSelectedClassId] = useState(
     courseList[0].modes.concentration.classes[0].id,
   )
-  const [selectedStudentId, setSelectedStudentId] = useState(
-    courseList[0].modes.concentration.classes[0].students[0].id,
-  )
-  const [searchTerm, setSearchTerm] = useState('')
   const [uploadedVideos, setUploadedVideos] = useState({})
-  const [generatedClasses, setGeneratedClasses] = useState([])
+  const [modeACourses, setModeACourses] = useState([])
+  const [modeBCourses, setModeBCourses] = useState(courseList)
+  const [modeBAssessments, setModeBAssessments] = useState([])
+  const [generatedClasses] = useState([])
   const [liveAlerts, setLiveAlerts] = useState([])
+  const [modeBStatus, setModeBStatus] = useState('idle')
   const [recentAlertId, setRecentAlertId] = useState(null)
+  const [isMonitoring, setIsMonitoring] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [activeAssessmentId, setActiveAssessmentId] = useState(null)
+  const eventSourceRef = useRef(null)
+  const liveAlertsRef = useRef([])
 
-  const courses = useMemo(
-    () => mergeGeneratedClasses(courseList, generatedClasses),
-    [generatedClasses],
+  const examCourses = useMemo(
+    () => mergeGeneratedClasses(modeBCourses, generatedClasses),
+    [modeBCourses, generatedClasses],
   )
+  const courses = selectedMode === 'concentration' ? modeACourses : examCourses
   const activeMode = modeOptions.find((mode) => mode.id === selectedMode) ?? modeOptions[0]
   const activeCourse = courses.find((course) => course.id === selectedCourseId) ?? courses[0]
 
   useEffect(() => {
-    if (!teacher || currentPage !== 'mode-workspace' || selectedMode !== 'exam') {
-      return undefined
+    const savedToken = window.localStorage.getItem(TOKEN_STORAGE_KEY)
+    const savedTeacher = window.localStorage.getItem(TEACHER_STORAGE_KEY)
+
+    if (!savedToken || !savedTeacher) return
+
+    refreshAllCourses(savedToken)
+      .then(({ modeA, modeB }) => {
+        setAuthToken(savedToken)
+        setTeacher(JSON.parse(savedTeacher))
+        setModeACourses(modeA)
+        setModeBCourses(modeB)
+        setCurrentPage('mode-select')
+      })
+      .catch(() => {
+        handleLogout()
+      })
+  }, [])
+
+  // Clean up SSE on unmount or when leaving Mode B
+  useEffect(() => {
+    if (currentPage !== 'mode-workspace' || selectedMode !== 'exam') {
+      stopMonitoring()
+    }
+    return () => stopMonitoring()
+  }, [currentPage, selectedMode])
+
+  const stopMonitoring = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
+      eventSourceRef.current = null
+    }
+    setIsMonitoring(false)
+    setModeBStatus('idle')
+  }, [])
+
+  const finalizeRef = useRef(null)
+
+  // Keep finalize function in a ref so SSE callbacks always have the latest
+  finalizeRef.current = async () => {
+    const assessId = activeAssessmentId
+    const alertsToSave = liveAlertsRef.current
+
+    stopMonitoring()
+
+    if (!assessId) {
+      setActiveAssessmentId(null)
+      return
     }
 
-    const examCourse = courses.find((course) => course.id === selectedCourseId) ?? courses[0]
-    const liveClass = examCourse.modes.exam.classes[0]
-    let alertIndex = 0
+    setIsSaving(true)
 
-    const pushAlert = () => {
-      const nextStudent = examCourse.students[alertIndex % examCourse.students.length]
-      const nextAlertMessage = EXAM_ALERT_MESSAGES[alertIndex % EXAM_ALERT_MESSAGES.length]
+    try {
+      await api.finalizeAssessment(authToken, assessId, alertsToSave)
+      const { modeA, modeB } = await refreshAllCourses(authToken)
+      setModeACourses(modeA)
+      setModeBCourses(modeB)
+    } catch (err) {
+      console.error('Failed to finalize assessment:', err)
+    } finally {
+      setIsSaving(false)
+      setActiveAssessmentId(null)
+    }
+  }
 
-      setLiveAlerts((current) => [
-        {
-          id: `${nextStudent.id}-${Date.now()}`,
-          studentId: nextStudent.id,
-          studentName: nextStudent.name,
-          seat: nextStudent.seat,
-          message: nextAlertMessage,
-          evidenceImage: `/evidence/exam-alert-${(alertIndex % 4) + 1}.png`,
-          time: new Date().toLocaleTimeString('en-US', {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          }),
-          classTitle: liveClass.title,
-        },
-        ...current,
-      ].slice(0, 6))
-
-      alertIndex += 1
+  const startMonitoring = useCallback((classroom, assessmentId) => {
+    // Close any existing stream
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close()
     }
 
-    const intervalId = window.setInterval(() => {
-      pushAlert()
-    }, 7000)
+    setActiveAssessmentId(assessmentId || null)
 
-    return () => window.clearInterval(intervalId)
-  }, [teacher, currentPage, selectedMode, selectedCourseId, generatedClasses.length, courses])
+    const selectedAssessment = modeBAssessments.find((a) =>
+      a.courseId === selectedCourseId && a.classroom === classroom
+    )
+    const assessmentTitle = selectedAssessment?.title || 'Live Exam'
+
+    const eventSource = new EventSource(api.modeBStreamUrl(authToken, classroom))
+    eventSourceRef.current = eventSource
+
+    setLiveAlerts([])
+    liveAlertsRef.current = []
+    setIsMonitoring(true)
+    setModeBStatus('connecting')
+
+    eventSource.addEventListener('status', (event) => {
+      const data = JSON.parse(event.data)
+      setModeBStatus(data.status)
+
+      // Auto-finalize when simulation completes
+      if (data.status === 'completed') {
+        eventSource.close()
+        eventSourceRef.current = null
+        setIsMonitoring(false)
+        // Use setTimeout to let state settle before finalizing
+        setTimeout(() => finalizeRef.current?.(), 100)
+      }
+    })
+
+    eventSource.addEventListener('heartbeat', () => {
+      setModeBStatus('running')
+    })
+
+    eventSource.addEventListener('alert', (event) => {
+      const data = JSON.parse(event.data)
+
+      const newAlert = {
+        id: data.id,
+        studentId: 'unknown',
+        studentName: 'Possible cheating',
+        seat: `Second ${data.second}`,
+        second: data.second,
+        confidence: data.confidence || 0,
+        message: `${data.message} Confidence: ${Math.round((data.confidence || 0) * 100)}%.`,
+        evidenceImage: data.evidenceImage,
+        time: data.time,
+        classTitle: assessmentTitle,
+      }
+
+      liveAlertsRef.current = [newAlert, ...liveAlertsRef.current].slice(0, 50)
+      setLiveAlerts((current) => [newAlert, ...current].slice(0, 10))
+    })
+
+    eventSource.onerror = () => {
+      setModeBStatus('error')
+      eventSource.close()
+      eventSourceRef.current = null
+      setIsMonitoring(false)
+    }
+  }, [authToken, selectedCourseId, modeBAssessments])
 
   useEffect(() => {
     if (!liveAlerts[0]?.id) return undefined
@@ -79,31 +184,88 @@ function App() {
     return () => window.clearTimeout(timeoutId)
   }, [liveAlerts])
 
-  const handleAuthSubmit = ({ email, name, school }) => {
-    setTeacher({
-      ...teacherProfile,
-      email,
-      name: name || teacherProfile.name,
-      school: school || teacherProfile.school,
-    })
-    setCurrentPage('mode-select')
+  const handleAuthSubmit = async ({ authMode, email, name, password }) => {
+    setAuthError('')
+    setIsAuthenticating(true)
+
+    try {
+      const response =
+        authMode === 'signup'
+          ? await api.signup({ name, email, password })
+          : await api.signin({ email, password })
+
+      const nextTeacher = {
+        ...teacherProfile,
+        ...response.teacher,
+      }
+      const { modeA, modeB } = await refreshAllCourses(response.token)
+
+      setTeacher(nextTeacher)
+      setAuthToken(response.token)
+      setModeACourses(modeA)
+      setModeBCourses(modeB)
+      window.localStorage.setItem(TOKEN_STORAGE_KEY, response.token)
+      window.localStorage.setItem(TEACHER_STORAGE_KEY, JSON.stringify(nextTeacher))
+      setCurrentPage('mode-select')
+    } catch (error) {
+      setAuthError(error.message)
+    } finally {
+      setIsAuthenticating(false)
+    }
   }
 
-  const syncWorkspaceSelection = (modeId, courseId, courseData = courses) => {
+  const refreshAllCourses = async (token) => {
+    const response = await api.getCourses(token)
+    let rawCourses = response.courses || []
+
+    if (rawCourses.length === 0) {
+      await Promise.all(
+        courseList.map((course) =>
+          api.createCourse(token, {
+            name: course.title,
+            code: course.code,
+            totalStudents: course.students.length,
+          }),
+        ),
+      )
+
+      rawCourses = (await api.getCourses(token)).courses || []
+    }
+
+    // Also fetch assessments
+    let assessments = []
+    try {
+      const assessmentRes = await api.getAssessments(token)
+      assessments = assessmentRes.assessments || []
+    } catch {
+      // Assessments might not exist yet
+    }
+
+    return {
+      modeA: adaptModeACourses(rawCourses),
+      modeB: adaptModeBCourses(rawCourses, assessments),
+      assessments,
+    }
+  }
+
+  const syncWorkspaceSelection = (modeId, courseId, courseData) => {
     const nextCourse = courseData.find((course) => course.id === courseId) ?? courseData[0]
-    const nextClasses = nextCourse.modes[modeId].classes
+    if (!nextCourse) return
+
+    const nextClasses = nextCourse.modes[modeId]?.classes || []
     const nextClass = nextClasses[0]
+    if (!nextClass) return
 
     setSelectedCourseId(nextCourse.id)
     setSelectedClassId(nextClass.id)
-    setSelectedStudentId(nextClass.students[0].id)
-    setSearchTerm('')
   }
 
   const handleModeSelect = (modeId) => {
+    const targetCourses = modeId === 'concentration' ? modeACourses : examCourses
+
     startTransition(() => {
       setSelectedMode(modeId)
-      syncWorkspaceSelection(modeId, selectedCourseId)
+      syncWorkspaceSelection(modeId, selectedCourseId, targetCourses)
       setCurrentPage('mode-workspace')
     })
   }
@@ -112,79 +274,157 @@ function App() {
     if (!selectedMode) return
 
     startTransition(() => {
-      syncWorkspaceSelection(selectedMode, courseId)
+      syncWorkspaceSelection(selectedMode, courseId, courses)
     })
   }
 
   const handleClassChange = (classId) => {
     if (!selectedMode) return
 
-    const course = courses.find((item) => item.id === selectedCourseId) ?? courses[0]
-    const nextClass =
-      course.modes[selectedMode].classes.find((item) => item.id === classId) ??
-      course.modes[selectedMode].classes[0]
-
     startTransition(() => {
-      setSelectedClassId(nextClass.id)
-      setSelectedStudentId(nextClass.students[0].id)
-      setSearchTerm('')
+      setSelectedClassId(classId)
     })
+  }
+
+  const handleAddAssessment = async (assessment) => {
+    try {
+      const response = await api.createAssessment(authToken, {
+        title: assessment.title,
+        date: assessment.date,
+        classroom: assessment.classroom,
+        courseId: selectedCourseId,
+      })
+
+      const saved = response.assessment
+      const newAssessment = {
+        id: saved._id,
+        courseId: selectedCourseId,
+        title: saved.title,
+        date: saved.date,
+        classroom: saved.classroom,
+        engagement: 100,
+        attendance: 0,
+        status: 'Ready',
+        isCompleted: false,
+        totalDetections: 0,
+        detections: [],
+        summaryStats: [{ label: 'Clean behavior', value: 100, color: '#10b981' }],
+        trend: [{ label: '0s', value: 0 }],
+        students: [],
+      }
+
+      setModeBAssessments((current) => [...current, newAssessment])
+
+      // Merge assessment into exam courses
+      setModeBCourses((current) =>
+        current.map((course) => {
+          if (course.id !== selectedCourseId) return course
+
+          const examMode = course.modes?.exam || { classes: [] }
+          return {
+            ...course,
+            modes: {
+              ...course.modes,
+              exam: {
+                ...examMode,
+                classes: [
+                  newAssessment,
+                  ...examMode.classes,
+                ],
+              },
+            },
+          }
+        }),
+      )
+
+      // Select the new assessment
+      startTransition(() => {
+        setSelectedClassId(newAssessment.id)
+      })
+    } catch (err) {
+      console.error('Failed to create assessment:', err)
+    }
+  }
+
+  const handleStartMonitoring = (classroom, assessmentId) => {
+    startMonitoring(classroom, assessmentId)
+  }
+
+  const handleStopMonitoring = () => {
+    finalizeRef.current?.()
   }
 
   const handleVideoPick = (event) => {
     const file = event.target.files?.[0]
-    if (!file || !selectedMode) return
+    if (!file || selectedMode !== 'concentration') return
 
     setUploadedVideos((current) => ({
       ...current,
-      [selectedMode]: file.name,
+      concentration: file,
     }))
+    setCurrentPage('upload')
   }
 
-  const handleAnalysisSubmit = (formState) => {
-    if (!selectedMode) return
+  const handleAnalysisSubmit = async (formState) => {
+    const selectedCourse = modeACourses.find((course) => course.id === selectedCourseId)
+    const uploadedVideo = uploadedVideos.concentration
 
-    const selectedCourse = courses.find((course) => course.id === selectedCourseId) ?? courses[0]
-    const newClass = buildMockAnalysis(selectedCourse, selectedMode, formState)
+    if (!selectedCourse || !uploadedVideo || !authToken) {
+      throw new Error('Select a course and video before running analysis.')
+    }
 
-    const nextGeneratedClasses = [
-      ...generatedClasses,
-      { courseId: selectedCourse.id, modeId: selectedMode, classData: newClass },
-    ]
+    const response = await api.analyzeModeAVideo(
+      authToken,
+      selectedCourse.id,
+      uploadedVideo,
+      formState,
+    )
+    const { modeA: nextCourses, modeB: nextBCourses } = await refreshAllCourses(authToken)
+    setModeBCourses(nextBCourses)
+    const nextCourse = nextCourses.find((course) => course.id === selectedCourse.id) ?? nextCourses[0]
+    const nextClass =
+      nextCourse?.modes.concentration.classes.find((item) => item.id === response.lectureId) ??
+      nextCourse?.modes.concentration.classes[0]
 
-    setGeneratedClasses(nextGeneratedClasses)
-
-    const nextCourses = mergeGeneratedClasses(courseList, nextGeneratedClasses)
-
+    setModeACourses(nextCourses)
     setUploadedVideos((current) => ({
       ...current,
-      [selectedMode]: undefined,
+      concentration: undefined,
     }))
 
     startTransition(() => {
       setCurrentPage('mode-workspace')
-      syncWorkspaceSelection(selectedMode, selectedCourse.id, nextCourses)
-      setSelectedClassId(newClass.id)
-      setSelectedStudentId(newClass.students[0].id)
+      if (nextCourse && nextClass) {
+        setSelectedCourseId(nextCourse.id)
+        setSelectedClassId(nextClass.id)
+      }
     })
   }
 
+  const handleLogout = () => {
+    setTeacher(null)
+    setAuthToken('')
+    setCurrentPage('auth')
+    setSelectedMode(null)
+    setUploadedVideos({})
+    window.localStorage.removeItem(TOKEN_STORAGE_KEY)
+    window.localStorage.removeItem(TEACHER_STORAGE_KEY)
+  }
+
   if (!teacher) {
-    return <AuthShell onSubmit={handleAuthSubmit} />
+    return (
+      <AuthShell
+        error={authError}
+        isSubmitting={isAuthenticating}
+        onSubmit={handleAuthSubmit}
+      />
+    )
   }
 
   if (currentPage === 'mode-select') {
     return (
       <AppBackground>
-        <ModeSelection
-          modes={modeOptions}
-          onLogout={() => {
-            setTeacher(null)
-            setCurrentPage('auth')
-          }}
-          onSelectMode={handleModeSelect}
-          teacher={teacher}
-        />
+        <ModeSelection modes={modeOptions} onLogout={handleLogout} onSelectMode={handleModeSelect} teacher={teacher} />
       </AppBackground>
     )
   }
@@ -197,7 +437,7 @@ function App() {
           mode={activeMode}
           onBack={() => setCurrentPage('mode-workspace')}
           onSubmit={handleAnalysisSubmit}
-          uploadedVideoName={uploadedVideos[selectedMode]}
+          uploadedVideoName={uploadedVideos.concentration?.name}
         />
       </AppBackground>
     )
@@ -207,27 +447,24 @@ function App() {
     <AppBackground>
       <ModeWorkspace
         courses={courses}
-        isLiveMonitoring={selectedMode === 'exam'}
+        isLiveMonitoring={isMonitoring}
+        isSaving={isSaving}
         liveAlerts={liveAlerts}
         mode={activeMode}
         recentAlertId={recentAlertId}
+        modeBStatus={modeBStatus}
         onBack={() => setCurrentPage('mode-select')}
         onClassChange={handleClassChange}
         onCourseChange={handleCourseChange}
-        onLogout={() => {
-          setTeacher(null)
-          setCurrentPage('auth')
-        }}
-        onOpenUploadPage={() => setCurrentPage('upload')}
-        onSearchChange={setSearchTerm}
-        onStudentChange={setSelectedStudentId}
+        onLogout={handleLogout}
         onVideoPick={handleVideoPick}
-        searchTerm={searchTerm}
+        onAddAssessment={handleAddAssessment}
+        onStartMonitoring={handleStartMonitoring}
+        onStopMonitoring={handleStopMonitoring}
         selectedClassId={selectedClassId}
         selectedCourseId={selectedCourseId}
-        selectedStudentId={selectedStudentId}
         teacher={teacher}
-        uploadedVideoName={uploadedVideos[selectedMode]}
+        uploadedVideoName={uploadedVideos.concentration?.name}
       />
     </AppBackground>
   )
@@ -265,56 +502,5 @@ function mergeGeneratedClasses(baseCourses, generated) {
     }
   })
 }
-
-function buildMockAnalysis(course, modeId, formState) {
-  const template = course.modes[modeId].classes[0]
-  const variance = 4
-  const title = formState.lectureTitle || 'New classrooms analysis'
-  const date = formatDate(formState.lectureDate)
-
-  return {
-    ...template,
-    id: `${course.id}-${modeId}-${Date.now()}`,
-    title,
-    date,
-    status: 'Generated',
-    engagement: 83,
-    students: template.students.map((student, index) => ({
-      ...student,
-      score: Math.max(48, Math.min(95, student.score - variance + index * 2)),
-      quickStats: student.quickStats.map((item) => ({ ...item })),
-      activityShare: student.activityShare.map((item) => ({ ...item })),
-      focusTrend: student.focusTrend.map((point, pointIndex) => ({
-        ...point,
-        value: Math.max(45, Math.min(96, point.value - 2 + pointIndex)),
-      })),
-    })),
-    trend: template.trend.map((point, index) => ({
-      ...point,
-      value: Math.max(58, Math.min(93, point.value + (index % 2 === 0 ? 2 : -1))),
-    })),
-    summaryStats: template.summaryStats.map((item) => ({ ...item })),
-    notes: formState.notes,
-    section: formState.section,
-  }
-}
-
-function formatDate(rawDate) {
-  if (!rawDate) return 'Pending date'
-
-  const date = new Date(rawDate)
-  return date.toLocaleDateString('en-US', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-  })
-}
-
-const EXAM_ALERT_MESSAGES = [
-  'Repeated glance toward nearby desk detected.',
-  'Possible phone interaction under the desk.',
-  'Head turn beyond allowed exam cone detected.',
-  'Suspicious sideways movement recorded by live feed.',
-]
 
 export default App

@@ -14,20 +14,25 @@ export function UploadAnalysisPage({
     notes: '',
   })
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [error, setError] = useState('')
 
   const handleChange = (event) => {
     const { name, value } = event.target
     setFormState((current) => ({ ...current, [name]: value }))
   }
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault()
     setIsAnalyzing(true)
+    setError('')
 
-    window.setTimeout(() => {
-      onSubmit(formState)
+    try {
+      await onSubmit(formState)
+    } catch (submitError) {
+      setError(submitError.message)
+    } finally {
       setIsAnalyzing(false)
-    }, 1400)
+    }
   }
 
   return (
@@ -46,8 +51,8 @@ export function UploadAnalysisPage({
               Upload classroom video
             </h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-              Add lecture details, attach the recorded classroom video, and later this page
-              can call the backend to generate a fresh analysis automatically.
+              Add lecture details and submit the selected video. The backend extracts frames,
+              calls Roboflow, stores the lecture, and returns class detection stats.
             </p>
           </div>
 
@@ -103,8 +108,13 @@ export function UploadAnalysisPage({
               disabled={!uploadedVideoName || isAnalyzing}
               type="submit"
             >
-              {isAnalyzing ? 'Analyzing video...' : 'Run analysis'}
+              {isAnalyzing ? 'Analyzing video...' : 'Run backend analysis'}
             </button>
+            {error ? (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {error}
+              </div>
+            ) : null}
           </form>
 
           <div className="space-y-5">
@@ -120,10 +130,10 @@ export function UploadAnalysisPage({
             </div>
 
             <div className="rounded-[28px] border border-sky-100 bg-sky-50 p-5">
-              <p className="text-sm font-semibold text-slate-900">Later backend hook</p>
+              <p className="text-sm font-semibold text-slate-900">Backend processing</p>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                This page is the right place to connect your future upload API and analysis
-                job status polling without changing the rest of the UI flow.
+                Keep this page open while the API samples one frame per second and saves
+                the resulting lecture analysis in MongoDB.
               </p>
             </div>
           </div>

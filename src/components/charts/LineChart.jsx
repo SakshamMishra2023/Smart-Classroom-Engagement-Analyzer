@@ -1,14 +1,27 @@
-export function LineChart({ data, color = '#2563eb', yLabel }) {
+export function LineChart({ data = [], series, color = '#2563eb', yLabel }) {
   const width = 320
   const height = 180
   const padding = 20
-  const max = Math.max(...data.map((item) => item.value), 100)
-  const min = Math.min(...data.map((item) => item.value), 0)
+  const chartSeries =
+    series?.length > 0
+      ? series
+      : [
+          {
+            label: yLabel,
+            color,
+            data,
+          },
+        ]
+  const labelData = chartSeries[0]?.data?.length ? chartSeries[0].data : data
+  const values = chartSeries.flatMap((item) => item.data.map((point) => point.value))
+  const max = Math.max(...values, 1)
+  const min = Math.min(...values, 0)
   const range = max - min || 1
 
-  const points = data
+  const getPointString = (seriesData) =>
+    seriesData
     .map((item, index) => {
-      const x = padding + (index * (width - padding * 2)) / Math.max(data.length - 1, 1)
+      const x = padding + (index * (width - padding * 2)) / Math.max(seriesData.length - 1, 1)
       const y = height - padding - ((item.value - min) / range) * (height - padding * 2)
       return `${x},${y}`
     })
@@ -18,7 +31,17 @@ export function LineChart({ data, color = '#2563eb', yLabel }) {
     <div className="w-full">
       <div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.24em] text-slate-400">
         <span>{yLabel}</span>
-        <span>{data[data.length - 1]?.value}</span>
+        <span className="flex gap-3">
+          {chartSeries.map((item) => (
+            <span className="inline-flex items-center gap-1" key={item.label}>
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: item.color }}
+              />
+              {item.label}: {item.data[item.data.length - 1]?.value ?? 0}
+            </span>
+          ))}
+        </span>
       </div>
       <svg className="h-52 w-full" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
         {[0, 1, 2, 3].map((line) => {
@@ -35,27 +58,41 @@ export function LineChart({ data, color = '#2563eb', yLabel }) {
             />
           )
         })}
-        <polyline
-          fill="none"
-          points={points}
-          stroke={color}
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="4"
-        />
-        {data.map((item, index) => {
-          const x = padding + (index * (width - padding * 2)) / Math.max(data.length - 1, 1)
-          const y = height - padding - ((item.value - min) / range) * (height - padding * 2)
+        {chartSeries.map((item) => (
+          <g key={item.label}>
+            <polyline
+              fill="none"
+              points={getPointString(item.data)}
+              stroke={item.color}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="4"
+            />
+            {item.data.map((point, index) => {
+              const x =
+                padding + (index * (width - padding * 2)) / Math.max(item.data.length - 1, 1)
+              const y = height - padding - ((point.value - min) / range) * (height - padding * 2)
 
-          return (
-            <circle className="hover:r-6 hover:fill-amber-400 transition-all cursor-pointer" key={item.label} cx={x} cy={y} fill={color} r="4.5">
-              <title>{item.label}: {item.value}</title>
-            </circle>
-          )
-        })}
+              return (
+                <circle
+                  className="cursor-pointer transition-all hover:fill-amber-400"
+                  cx={x}
+                  cy={y}
+                  fill={item.color}
+                  key={`${item.label}-${point.label}`}
+                  r="4.5"
+                >
+                  <title>
+                    {point.label} {item.label}: {point.value}
+                  </title>
+                </circle>
+              )
+            })}
+          </g>
+        ))}
       </svg>
-      <div className="mt-3 grid grid-cols-6 text-xs text-slate-500">
-        {data.map((item) => (
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-slate-500">
+        {labelData.map((item) => (
           <span key={item.label}>{item.label}</span>
         ))}
       </div>
